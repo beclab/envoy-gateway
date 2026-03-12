@@ -9,6 +9,7 @@ security updates: |
 
 # New features or capabilities added in this release.
 new features: |
+  Added support for patching multiple resources with `nameSelector` in EnvoyExtensionPolicy.
 
 bug fixes: |
 
