@@ -2,6 +2,7 @@ date: Pending
 
 # Changes that are expected to cause an incompatibility with previous versions, such as deletions or modifications to existing APIs.
 breaking changes: |
+  `ClientTrafficPolicy.spec.clientIPDetection` now requires exactly one of `xForwardedFor`, `customHeader`, or `directRemoteAddress` to be set. Previously an empty `clientIPDetection: {}` was accepted; it is now rejected by CEL validation.
   Merged SecurityPolicy IR/xDS resource names (OIDC, BasicAuth, ExtAuth, JWT) now derive from the policy that contributes the field (parent or route) rather than always using the route-level policy. EnvoyPatchPolicy users who reference those generated names must update their patch targets.
 
 # Updates addressing vulnerabilities, security flaws, or compliance requirements.
@@ -9,7 +10,7 @@ security updates: |
 
 # New features or capabilities added in this release.
 new features: |
-  Added `ClientTrafficPolicy.spec.clientIPDetection.downstreamRemoteAddress` to opt the listener into using the downstream TCP connection source address as the client IP. This unlocks SecurityPolicy `clientIPGeoLocations` in L4-transparent topologies (e.g. AWS NLB with `target-type: instance` + `externalTrafficPolicy: Local`, Azure Standard Load Balancer).
+  Added `ClientTrafficPolicy.spec.clientIPDetection.directRemoteAddress` to opt the listener into using the downstream TCP connection source address as the client IP. This unlocks SecurityPolicy `clientIPGeoLocations` in L4-transparent topologies (e.g. AWS NLB with `target-type: instance` + `externalTrafficPolicy: Local`, Azure Standard Load Balancer).
 
 bug fixes: |
   Fixed SecurityPolicy merge using the wrong policy as the owner for resource references and IR generation.

@@ -2474,11 +2474,11 @@ func validateAuthorizationGeoIP(
 	if clientIPDetection.CustomHeader != nil {
 		modeCount++
 	}
-	if clientIPDetection.DownstreamRemoteAddress != nil {
+	if clientIPDetection.DirectRemoteAddress != nil {
 		modeCount++
 	}
 	if modeCount != 1 {
-		return nil, errors.New("authorization clientIPGeoLocations requires exactly one of ClientTrafficPolicy.spec.clientIPDetection.{xForwardedFor,customHeader,downstreamRemoteAddress}")
+		return nil, errors.New("authorization clientIPGeoLocations requires exactly one of ClientTrafficPolicy.spec.clientIPDetection.{xForwardedFor,customHeader,directRemoteAddress}")
 	}
 
 	if clientIPDetection.XForwardedFor != nil &&
