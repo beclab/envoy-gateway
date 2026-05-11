@@ -9,7 +9,7 @@ security updates: |
 
 # New features or capabilities added in this release.
 new features: |
-  SecurityPolicy authorization `clientIPGeoLocations` no longer requires `ClientTrafficPolicy.spec.clientIPDetection`. When omitted, the geoip filter uses the downstream connection source address, supporting L4-transparent topologies (e.g. AWS NLB with `target-type: instance` + `externalTrafficPolicy: Local`, Azure Standard Load Balancer).
+  Added `ClientTrafficPolicy.spec.clientIPDetection.downstreamRemoteAddress` to opt the listener into using the downstream TCP connection source address as the client IP. This unlocks SecurityPolicy `clientIPGeoLocations` in L4-transparent topologies (e.g. AWS NLB with `target-type: instance` + `externalTrafficPolicy: Local`, Azure Standard Load Balancer).
 
 bug fixes: |
   Fixed SecurityPolicy merge using the wrong policy as the owner for resource references and IR generation.
