@@ -1309,6 +1309,38 @@ func Test_validateAuthorizationGeoIPForHTTP(t *testing.T) {
 			wantErr: "requires ClientTrafficPolicy.spec.clientIPDetection to be configured",
 		},
 		{
+			name:          "empty client ip detection rejected",
+			authorization: newAuthorization(egv1a1.ClientIPGeoLocation{Country: new("US")}),
+			envoyProxy: newEnvoyProxy(&egv1a1.GeoIPMaxMind{
+				CountryDBSource: countryDB,
+			}),
+			clientIPDetection: &ir.ClientIPDetectionSettings{},
+			wantErr:           "requires exactly one of ClientTrafficPolicy.spec.clientIPDetection.{xForwardedFor,customHeader,directRemoteAddress}",
+		},
+		{
+			name:          "multiple client ip detection modes rejected",
+			authorization: newAuthorization(egv1a1.ClientIPGeoLocation{Country: new("US")}),
+			envoyProxy: newEnvoyProxy(&egv1a1.GeoIPMaxMind{
+				CountryDBSource: countryDB,
+			}),
+			clientIPDetection: &ir.ClientIPDetectionSettings{
+				CustomHeader:        &egv1a1.CustomHeaderExtensionSettings{Name: "x-real-client-ip"},
+				DirectRemoteAddress: &egv1a1.DirectRemoteAddressSettings{},
+			},
+			wantErr: "requires exactly one of ClientTrafficPolicy.spec.clientIPDetection.{xForwardedFor,customHeader,directRemoteAddress}",
+		},
+		{
+			name:          "direct remote address accepted",
+			authorization: newAuthorization(egv1a1.ClientIPGeoLocation{Country: new("US")}),
+			envoyProxy: newEnvoyProxy(&egv1a1.GeoIPMaxMind{
+				CountryDBSource: countryDB,
+			}),
+			clientIPDetection: &ir.ClientIPDetectionSettings{
+				DirectRemoteAddress: &egv1a1.DirectRemoteAddressSettings{},
+			},
+			wantProvider: true,
+		},
+		{
 			name:          "trusted cidrs rejected",
 			authorization: newAuthorization(egv1a1.ClientIPGeoLocation{Country: new("US")}),
 			envoyProxy: newEnvoyProxy(&egv1a1.GeoIPMaxMind{
