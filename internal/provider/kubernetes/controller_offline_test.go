@@ -155,6 +155,8 @@ func TestNewOfflineGatewayAPIControllerIndexRegistration(t *testing.T) {
 		require.NoError(t, err)
 		err = cli.List(context.Background(), &gwapiv1.GRPCRouteList{}, client.MatchingFields{backendGRPCRouteIndex: "any"})
 		require.NoError(t, err)
+		err = cli.List(context.Background(), &gwapiv1.GRPCRouteList{}, client.MatchingFields{httpRouteFilterGRPCRouteIndex: "any"})
+		require.NoError(t, err)
 	})
 
 	t.Run("TCPRoute indices", func(t *testing.T) {
@@ -239,6 +241,8 @@ func TestNewOfflineGatewayAPIControllerIndexRegistration(t *testing.T) {
 		err := cli.List(context.Background(), &egv1a1.HTTPRouteFilterList{}, client.MatchingFields{configMapHTTPRouteFilterIndex: "any"})
 		require.NoError(t, err)
 		err = cli.List(context.Background(), &egv1a1.HTTPRouteFilterList{}, client.MatchingFields{secretHTTPRouteFilterIndex: "any"})
+		require.NoError(t, err)
+		err = cli.List(context.Background(), &egv1a1.HTTPRouteFilterList{}, client.MatchingFields{backendHTTPRouteFilterIndex: "any"})
 		require.NoError(t, err)
 	})
 

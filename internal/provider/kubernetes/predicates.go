@@ -543,6 +543,10 @@ func (r *gatewayAPIReconciler) isRouteReferencingBackend(nsName *types.Namespace
 		return true
 	}
 
+	if r.hrfCRDExists && r.isHTTPRouteFilterReferencingBackend(nsName) {
+		return true
+	}
+
 	grpcRouteList := &gwapiv1.GRPCRouteList{}
 	if err := r.client.List(ctx, grpcRouteList, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(backendGRPCRouteIndex, nsName.String()),
@@ -974,7 +978,7 @@ func (r *gatewayAPIReconciler) isExtensionPolicyReferencingSecret(nsName *types.
 	return len(eepList.Items) > 0
 }
 
-// isRouteReferencingHTTPRouteFilter returns true if the HTTPRouteFilter is referenced by an HTTPRoute
+// isRouteReferencingHTTPRouteFilter returns true if the HTTPRouteFilter is referenced by an HTTPRoute or GRPCRoute.
 func (r *gatewayAPIReconciler) isRouteReferencingHTTPRouteFilter(nsName *types.NamespacedName) bool {
 	ctx := context.Background()
 	httpRouteList := &gwapiv1.HTTPRouteList{}
@@ -985,7 +989,43 @@ func (r *gatewayAPIReconciler) isRouteReferencingHTTPRouteFilter(nsName *types.N
 		return false
 	}
 
-	return len(httpRouteList.Items) != 0
+	if len(httpRouteList.Items) != 0 {
+		return true
+	}
+
+	grpcRouteList := &gwapiv1.GRPCRouteList{}
+	if err := r.client.List(ctx, grpcRouteList, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(httpRouteFilterGRPCRouteIndex, nsName.String()),
+	}); err != nil {
+		r.log.Error(err, "unable to find associated GRPCRoutes")
+		return false
+	}
+
+	return len(grpcRouteList.Items) != 0
+}
+
+func (r *gatewayAPIReconciler) isHTTPRouteFilterReferencingBackend(nsName *types.NamespacedName) bool {
+	ctx := context.Background()
+	routeFilterList := &egv1a1.HTTPRouteFilterList{}
+	if err := r.client.List(ctx, routeFilterList, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(backendHTTPRouteFilterIndex, nsName.String()),
+	}); err != nil && !kerrors.IsNotFound(err) {
+		r.log.Error(err, "failed to find associated HTTPRouteFilters")
+		return false
+	}
+
+	for i := range routeFilterList.Items {
+		routeFilter := &routeFilterList.Items[i]
+		filterNSName := types.NamespacedName{
+			Namespace: routeFilter.Namespace,
+			Name:      routeFilter.Name,
+		}
+		if r.isRouteReferencingHTTPRouteFilter(&filterNSName) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // isProxyServiceCluster returns true if the provided labels reference an owning Gateway or GatewayClass

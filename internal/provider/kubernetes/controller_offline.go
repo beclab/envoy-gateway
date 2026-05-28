@@ -164,6 +164,7 @@ func newOfflineGatewayAPIClient(extensionPolicies []schema.GroupVersionKind) cli
 		WithIndex(&gwapiv1.HTTPRoute{}, httpRouteFilterHTTPRouteIndex, httpRouteFilterHTTPRouteIndexFunc).
 		WithIndex(&gwapiv1.GRPCRoute{}, gatewayGRPCRouteIndex, gatewayGRPCRouteIndexFunc).
 		WithIndex(&gwapiv1.GRPCRoute{}, backendGRPCRouteIndex, backendGRPCRouteIndexFunc).
+		WithIndex(&gwapiv1.GRPCRoute{}, httpRouteFilterGRPCRouteIndex, httpRouteFilterGRPCRouteIndexFunc).
 		WithIndex(&gwapiv1a2.TCPRoute{}, gatewayTCPRouteIndex, gatewayTCPRouteIndexFunc).
 		WithIndex(&gwapiv1a2.TCPRoute{}, backendTCPRouteIndex, backendTCPRouteIndexFunc).
 		WithIndex(&gwapiv1a2.UDPRoute{}, gatewayUDPRouteIndex, gatewayUDPRouteIndexFunc).
@@ -190,6 +191,7 @@ func newOfflineGatewayAPIClient(extensionPolicies []schema.GroupVersionKind) cli
 		WithIndex(&egv1a1.Backend{}, clusterTrustBundleBackendIndex, clusterTrustBundleBackendIndexFunc).
 		WithIndex(&egv1a1.HTTPRouteFilter{}, configMapHTTPRouteFilterIndex, configMapRouteFilterIndexFunc).
 		WithIndex(&egv1a1.HTTPRouteFilter{}, secretHTTPRouteFilterIndex, secretRouteFilterIndexFunc).
+		WithIndex(&egv1a1.HTTPRouteFilter{}, backendHTTPRouteFilterIndex, backendHTTPRouteFilterIndexFunc).
 		WithIndex(&gwapiv1b1.ReferenceGrant{}, targetRefGrantRouteIndex, getReferenceGrantIndexerFunc).
 		Build()
 }
