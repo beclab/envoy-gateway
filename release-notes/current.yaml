@@ -10,6 +10,7 @@ security updates: |
 
 # New features or capabilities added in this release.
 new features: |
+  Added a new `host` section to `ClientTrafficPolicy` with `stripPortMode` and `stripTrailingHostDot` fields to normalize the Host/Authority header (port stripping and trailing dot removal) without an EnvoyPatchPolicy.
 
 bug fixes: |
   Fixed the xDS server in GatewayNamespaceMode serving a stale certificate after cert-manager rotation by re-reading the cert from disk on every TLS handshake.
