@@ -46,6 +46,7 @@ Please follow the example [Gateway Namespace Mode][].
 and **creates** managed data plane resources such as EnvoyProxy `Deployment` in the **namespace where Envoy Gateway is running**.
 * Envoy Gateway also supports [Namespaced deployment mode][], you can watch resources in the specific namespaces by assigning
 `EnvoyGateway.provider.kubernetes.watch.namespaces` or `EnvoyGateway.provider.kubernetes.watch.namespaceSelector` and **creates** managed data plane resources in the **namespace where Envoy Gateway is running**.
+  The namespace where Envoy Gateway is running is always included so Envoy Gateway can reconcile its own managed infrastructure resources.
 
 ### Multi-tenancy
 
@@ -1077,7 +1078,7 @@ curl --header "Host: www.merged3.com" http://$GATEWAY_HOST:8082/example3
 
 [Quickstart]: ../quickstart.md
 [EnvoyProxy]: ../../api/extension_types#envoyproxy
-[GatewayClass]: https://gateway-api.sigs.k8s.io/api-types/gatewayclass/
+[GatewayClass]: https://gateway-api.sigs.k8s.io/reference/api-types/gatewayclass/
 [Namespaced deployment mode]: ../../api/extension_types#kuberneteswatchmode
 [Gateway Namespace Mode]: ./gateway-namespace-mode
 [issue1231]: https://github.com/envoyproxy/gateway/issues/1231
