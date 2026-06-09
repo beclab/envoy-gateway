@@ -798,7 +798,6 @@ func (t *Translator) validateAllowedRoutes(listener *ListenerContext, routeKinds
 
 type portListeners struct {
 	listeners []*ListenerContext
-	protocols sets.Set[string]
 	hostnames map[string]int
 }
 
@@ -950,22 +949,11 @@ func (t *Translator) validateConflictedLayer7Listeners(gateways []*GatewayContex
 			}
 			if portListenerInfo[listener.Port] == nil {
 				portListenerInfo[listener.Port] = &portListeners{
-					protocols: sets.Set[string]{},
 					hostnames: map[string]int{},
 				}
 			}
 
 			portListenerInfo[listener.Port].listeners = append(portListenerInfo[listener.Port].listeners, listener)
-
-			var protocol string
-			switch listener.Protocol {
-			// HTTPS and TLS can co-exist on the same port
-			case gwapiv1.HTTPSProtocolType, gwapiv1.TLSProtocolType:
-				protocol = "https/tls"
-			default:
-				protocol = string(listener.Protocol)
-			}
-			portListenerInfo[listener.Port].protocols.Insert(protocol)
 
 			var hostname string
 			if listener.Hostname != nil {
@@ -1019,11 +1007,6 @@ func (t *Translator) validateConflictedLayer7Listeners(gateways []*GatewayContex
 			}
 
 			for _, listener := range info.listeners {
-				if len(info.protocols) > 1 {
-					setConflictedConditions(listener, gwapiv1.ListenerReasonProtocolConflict,
-						"All listeners for a given port must use a compatible protocol")
-				}
-
 				var hostname string
 				if listener.Hostname != nil {
 					hostname = string(*listener.Hostname)
