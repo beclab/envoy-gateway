@@ -858,6 +858,9 @@ func (t *Translator) validateConflictedProtocolsListeners(gateways []*GatewayCon
 			// Multiple gateway listeners sharing the same protocol is fine — they all contribute
 			// to that protocol being the "gateway winner".
 			nonListenerSetProtocols := sets.New[string]()
+			// Track which ListenerSets have multiple protocols on this port (no winner for those).
+			sameListenerSetProtocolConflicts := sets.New[string]()
+			listenerSetProtocolsOnPort := map[string]sets.Set[string]{}
 			for _, listener := range listenersOnPort {
 				protocol := getProtocolForListener(listener)
 				if protocol == string(gwapiv1.UDPProtocolType) {
@@ -866,6 +869,15 @@ func (t *Translator) validateConflictedProtocolsListeners(gateways []*GatewayCon
 				nonUDPProtocols.Insert(protocol)
 				if !listener.isFromListenerSet() {
 					nonListenerSetProtocols.Insert(protocol)
+				} else {
+					lsKey := listener.listenerSet.Namespace + "/" + listener.listenerSet.Name
+					if listenerSetProtocolsOnPort[lsKey] == nil {
+						listenerSetProtocolsOnPort[lsKey] = sets.New[string]()
+					}
+					listenerSetProtocolsOnPort[lsKey].Insert(protocol)
+					if listenerSetProtocolsOnPort[lsKey].Len() > 1 {
+						sameListenerSetProtocolConflicts.Insert(lsKey)
+					}
 				}
 			}
 
@@ -899,6 +911,17 @@ func (t *Translator) validateConflictedProtocolsListeners(gateways []*GatewayCon
 				// Skip UDP listeners as they are handled by validateConflictedLayer4Listeners
 				if protocol == string(gwapiv1.UDPProtocolType) {
 					continue
+				}
+
+				// When no Gateway listener establishes a winner protocol, a ListenerSet with
+				// internal protocol conflicts has no winner: all its listeners are marked.
+				if listener.isFromListenerSet() && nonListenerSetProtocols.Len() == 0 {
+					lsKey := listener.listenerSet.Namespace + "/" + listener.listenerSet.Name
+					if sameListenerSetProtocolConflicts.Has(lsKey) {
+						setConflictedConditions(listener, gwapiv1.ListenerReasonProtocolConflict,
+							"All listeners for a given port must use a compatible protocol")
+						continue
+					}
 				}
 
 				// If we have an explicit winner protocol, use it; otherwise first one wins

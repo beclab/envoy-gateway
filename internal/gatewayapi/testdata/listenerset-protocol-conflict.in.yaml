@@ -133,6 +133,33 @@ listenerSets:
           allowedRoutes:
             namespaces:
               from: All
+  # Both listeners should be rejected because they conflict with each other (no gateway winner on port 82).
+  - apiVersion: gateway.networking.k8s.io/v1
+    kind: ListenerSet
+    metadata:
+      name: listenerset-with-internal-protocol-conflict
+      namespace: gateway-conformance-infra
+    spec:
+      parentRef:
+        kind: Gateway
+        group: gateway.networking.k8s.io
+        name: gateway-with-listenerset-protocol-conflict
+        namespace: gateway-conformance-infra
+      listeners:
+        # Both of the following listeners should be rejected since they conflict with each other
+        - name: internal-conflict-http
+          port: 82
+          protocol: HTTP
+          hostname: "internal-conflict-http.com"
+          allowedRoutes:
+            namespaces:
+              from: All
+        - name: internal-conflict-tcp
+          port: 82
+          protocol: TCP
+          allowedRoutes:
+            namespaces:
+              from: All
   # The first listener is invalid due to unsupported protocol and should not block
   # the following valid listener on the same port.
   - apiVersion: gateway.networking.k8s.io/v1

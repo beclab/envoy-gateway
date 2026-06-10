@@ -435,6 +435,98 @@ listenerSets:
 - apiVersion: gateway.networking.k8s.io/v1
   kind: ListenerSet
   metadata:
+    name: listenerset-with-internal-protocol-conflict
+    namespace: gateway-conformance-infra
+  spec:
+    listeners:
+    - allowedRoutes:
+        namespaces:
+          from: All
+      hostname: internal-conflict-http.com
+      name: internal-conflict-http
+      port: 82
+      protocol: HTTP
+    - allowedRoutes:
+        namespaces:
+          from: All
+      name: internal-conflict-tcp
+      port: 82
+      protocol: TCP
+    parentRef:
+      group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gateway-with-listenerset-protocol-conflict
+      namespace: gateway-conformance-infra
+  status:
+    conditions:
+    - lastTransitionTime: null
+      message: No listeners are accepted
+      reason: ListenersNotValid
+      status: "False"
+      type: Accepted
+    - lastTransitionTime: null
+      message: No listeners are programmed
+      reason: ListenersNotValid
+      status: "False"
+      type: Programmed
+    listeners:
+    - attachedRoutes: 0
+      conditions:
+      - lastTransitionTime: null
+        message: All listeners for a given port must use a compatible protocol
+        reason: ProtocolConflict
+        status: "True"
+        type: Conflicted
+      - lastTransitionTime: null
+        message: All listeners for a given port must use a compatible protocol
+        reason: ProtocolConflict
+        status: "False"
+        type: Accepted
+      - lastTransitionTime: null
+        message: All listeners for a given port must use a compatible protocol
+        reason: ProtocolConflict
+        status: "False"
+        type: Programmed
+      - lastTransitionTime: null
+        message: Listener references have been resolved
+        reason: ResolvedRefs
+        status: "True"
+        type: ResolvedRefs
+      name: internal-conflict-http
+      supportedKinds:
+      - group: gateway.networking.k8s.io
+        kind: HTTPRoute
+      - group: gateway.networking.k8s.io
+        kind: GRPCRoute
+    - attachedRoutes: 0
+      conditions:
+      - lastTransitionTime: null
+        message: All listeners for a given port must use a compatible protocol
+        reason: ProtocolConflict
+        status: "True"
+        type: Conflicted
+      - lastTransitionTime: null
+        message: All listeners for a given port must use a compatible protocol
+        reason: ProtocolConflict
+        status: "False"
+        type: Accepted
+      - lastTransitionTime: null
+        message: All listeners for a given port must use a compatible protocol
+        reason: ProtocolConflict
+        status: "False"
+        type: Programmed
+      - lastTransitionTime: null
+        message: Listener references have been resolved
+        reason: ResolvedRefs
+        status: "True"
+        type: ResolvedRefs
+      name: internal-conflict-tcp
+      supportedKinds:
+      - group: gateway.networking.k8s.io
+        kind: TCPRoute
+- apiVersion: gateway.networking.k8s.io/v1
+  kind: ListenerSet
+  metadata:
     name: listenerset-invalid-first-should-not-block-valid
     namespace: gateway-conformance-infra
   spec:
