@@ -909,6 +909,7 @@ spec:
             drop:
             - ALL
           privileged: false
+          readOnlyRootFilesystem: true
           runAsGroup: 65532
           runAsNonRoot: true
           runAsUser: 65532
@@ -921,6 +922,8 @@ spec:
         - mountPath: /certs
           name: certs
           readOnly: true
+        - mountPath: /var/lib/eg/wasm
+          name: wasm-cache
       imagePullSecrets: []
       serviceAccountName: envoy-gateway
       terminationGracePeriodSeconds: 10
@@ -932,6 +935,10 @@ spec:
       - name: certs
         secret:
           secretName: envoy-gateway
+      # Writable cache for Wasm modules; required because the controller's
+      # root filesystem is read-only by default (readOnlyRootFilesystem).
+      - name: wasm-cache
+        emptyDir: {}
 ---
 # Source: gateway-helm/charts/crds/templates/gatewayapi-safe-upgrade-policy.yaml
 #
@@ -1134,6 +1141,13 @@ spec:
         app: certgen
     spec:
       automountServiceAccountToken: true
+      securityContext:
+        fsGroup: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - command:
         - envoy-gateway
