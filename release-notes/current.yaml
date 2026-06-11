@@ -13,6 +13,7 @@ security updates: |
 new features: |
   Added support for authorization path match.
   Added a `requestBody` field to the HTTP active health checker in `BackendTrafficPolicy`, allowing a request body payload to be sent during HTTP health checking. The field requires the health check `method` to be `POST` or `PUT`.
+  Added a `drainDelay` field to `ShutdownConfig`, delaying the start of the Envoy proxy drain sequence on pod termination. During the delay the proxy continues to accept and serve new connections, allowing external load balancers that rely on health-check based de-registration (e.g. L4 passthrough load balancers) to stop sending traffic to the terminating pod before it stops serving.
 
 bug fixes: |
   Fixed Backend TLS `alpnProtocols: []` to disable upstream ALPN instead of inheriting EnvoyProxy BackendTLS defaults.
