@@ -2485,6 +2485,51 @@ func TestEnvoyProxyProvider(t *testing.T) {
 			},
 			wantErrors: []string{"If type is Remote, local field must not be set"},
 		},
+		{
+			desc: "luaValidationAllowlist-valid",
+			mutate: func(envoy *egv1a1.EnvoyProxy) {
+				envoy.Spec = egv1a1.EnvoyProxySpec{
+					LuaValidationAllowlist: &egv1a1.LuaValidationAllowlist{
+						AllowedPaths:   []string{"/tmp"},
+						AllowedEnvVars: []string{"LOG_LEVEL"},
+					},
+				}
+			},
+			wantErrors: []string{},
+		},
+		{
+			desc: "luaValidationAllowlist-empty-path-rejected",
+			mutate: func(envoy *egv1a1.EnvoyProxy) {
+				envoy.Spec = egv1a1.EnvoyProxySpec{
+					LuaValidationAllowlist: &egv1a1.LuaValidationAllowlist{
+						AllowedPaths: []string{""},
+					},
+				}
+			},
+			wantErrors: []string{"should be at least 1 chars long"},
+		},
+		{
+			desc: "luaValidationAllowlist-whitespace-path-rejected",
+			mutate: func(envoy *egv1a1.EnvoyProxy) {
+				envoy.Spec = egv1a1.EnvoyProxySpec{
+					LuaValidationAllowlist: &egv1a1.LuaValidationAllowlist{
+						AllowedPaths: []string{"  "},
+					},
+				}
+			},
+			wantErrors: []string{"allowedPaths entries must not be blank or whitespace-only"},
+		},
+		{
+			desc: "luaValidationAllowlist-whitespace-envvar-rejected",
+			mutate: func(envoy *egv1a1.EnvoyProxy) {
+				envoy.Spec = egv1a1.EnvoyProxySpec{
+					LuaValidationAllowlist: &egv1a1.LuaValidationAllowlist{
+						AllowedEnvVars: []string{"  "},
+					},
+				}
+			},
+			wantErrors: []string{"allowedEnvVars entries must not be blank or whitespace-only"},
+		},
 	}
 
 	for _, tc := range cases {

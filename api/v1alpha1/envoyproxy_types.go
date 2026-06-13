@@ -189,6 +189,20 @@ type EnvoyProxySpec struct {
 	// +optional
 	LuaValidation *LuaValidation `json:"luaValidation,omitempty"`
 
+	// LuaValidationAllowlist defines the filesystem paths and environment variables that Lua
+	// scripts from EnvoyExtensionPolicy resources are permitted to access during Strict
+	// validation in the gateway controller.
+	//
+	// The allowlist is fail-closed: when unset or empty, Lua scripts are denied access to ALL
+	// filesystem paths and environment variables during validation. Only entries that match the
+	// allowlist are permitted.
+	//
+	// This field only takes effect when LuaValidation is Strict (the default). It has no effect
+	// for the InsecureSyntax or Disabled validation modes, which do not execute the security sandbox.
+	//
+	// +optional
+	LuaValidationAllowlist *LuaValidationAllowlist `json:"luaValidationAllowlist,omitempty"`
+
 	// DynamicModules defines the set of dynamic modules that are allowed to be
 	// used by EnvoyExtensionPolicy resources and dynamic module load balancer
 	// policies. Each entry registers a module by a logical name and specifies
@@ -249,6 +263,39 @@ const (
 	// Not recommended unless you completely trust all EnvoyExtensionPolicy resources.
 	LuaValidationDisabled LuaValidation = "Disabled"
 )
+
+// LuaValidationAllowlist defines the filesystem paths and environment variables that Lua scripts
+// are permitted to access during Strict Lua validation in the gateway controller.
+// The allowlist is fail-closed: access to any path or environment variable that does not match an
+// entry below is denied.
+type LuaValidationAllowlist struct {
+	// AllowedPaths is the list of filesystem path prefixes that Lua scripts are permitted to
+	// access during validation (via io.open, io.input, io.output, io.lines, os.remove, os.rename).
+	// A path is allowed when it equals an entry or is contained within an entry's subtree
+	// (e.g. "/tmp" allows "/tmp/file.txt"). Paths are normalized (separators collapsed, made
+	// absolute) before matching, and any "." or ".." traversal segment is always rejected.
+	// When empty, all filesystem access is denied. Blank or whitespace-only entries are rejected,
+	// as they would otherwise match every path and disable the sandbox.
+	//
+	// +kubebuilder:validation:MaxItems=64
+	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=4096
+	// +kubebuilder:validation:XValidation:rule="self.all(p, p.trim() != '')",message="allowedPaths entries must not be blank or whitespace-only"
+	// +optional
+	AllowedPaths []string `json:"allowedPaths,omitempty"`
+
+	// AllowedEnvVars is the list of environment variable names that Lua scripts are permitted to
+	// access during validation (via os.getenv, os.setenv). Matching is exact and case-sensitive.
+	// When empty, access to all environment variables is denied. Blank or whitespace-only entries
+	// are rejected.
+	//
+	// +kubebuilder:validation:MaxItems=64
+	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=256
+	// +kubebuilder:validation:XValidation:rule="self.all(e, e.trim() != '')",message="allowedEnvVars entries must not be blank or whitespace-only"
+	// +optional
+	AllowedEnvVars []string `json:"allowedEnvVars,omitempty"`
+}
 
 // RoutingType defines the type of routing of this Envoy proxy.
 type RoutingType string
