@@ -298,6 +298,7 @@ func (r *Runner) subscribeAndTranslate(sub <-chan watchable.Snapshot[string, *re
 					BackendEnabled:                  r.EnvoyGateway.ExtensionAPIs != nil && r.EnvoyGateway.ExtensionAPIs.EnableBackend,
 					SDSSecretRefEnabled:             r.EnvoyGateway.ExtensionAPIs != nil && r.EnvoyGateway.ExtensionAPIs.EnableSDSSecretRef,
 					ControllerNamespace:             r.ControllerNamespace,
+					DNSDomain:                       r.DNSDomain,
 					GatewayNamespaceMode:            r.EnvoyGateway.GatewayNamespaceMode(),
 					MergeGateways:                   gatewayapi.IsMergeGatewaysEnabled(resources),
 					WasmCache:                       r.wasmCache,
