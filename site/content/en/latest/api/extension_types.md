@@ -381,6 +381,7 @@ _Appears in:_
 BackendConnection allows users to configure connection-level settings of backend
 
 _Appears in:_
+- [BackendSettings](#backendsettings)
 - [BackendTrafficPolicySpec](#backendtrafficpolicyspec)
 - [ClusterSettings](#clustersettings)
 
@@ -451,6 +452,29 @@ _Appears in:_
 | `port` | _[PortNumber](#portnumber)_ |  false  |  | Port specifies the destination port number to use for this resource.<br />Port is required when the referent is a Kubernetes Service. In this<br />case, the port number is the service port number, not the target port.<br />For other resources, destination port might be derived from the referent<br />resource or this field. |
 | `weight` | _integer_ |  false  | 1 | Weight specifies the proportion of requests forwarded to the referenced<br />backend. This is computed as weight/(sum of all weights in this<br />BackendRefs list). For non-zero values, there may be some epsilon from<br />the exact proportion defined here depending on the precision an<br />implementation supports. Weight is not a percentage and the sum of<br />weights does not need to equal 100.<br />If only one backend is specified and it has a weight greater than 0, 100%<br />of the traffic is forwarded to that backend. If weight is set to 0, no<br />traffic should be forwarded for this entry. If unspecified, weight<br />defaults to 1.<br />Support for this field varies based on the context where used. |
 | `fallback` | _boolean_ |  false  |  | Fallback indicates whether the backend is designated as a fallback.<br />Multiple fallback backends can be configured.<br />It is highly recommended to configure active or passive health checks to ensure that failover can be detected<br />when the active backends become unhealthy and to automatically readjust once the primary backends are healthy again.<br />The overprovisioning factor is set to 1.4, meaning the fallback backends will only start receiving traffic when<br />the health of the active backends falls below 72%. |
+
+
+#### BackendSettings
+
+
+
+BackendSettings contains CDS-only fields that configure the upstream Envoy Cluster.
+
+_Appears in:_
+- [BackendTrafficPolicySpec](#backendtrafficpolicyspec)
+- [ClusterSettings](#clustersettings)
+
+| Field | Type | Required | Default | Description |
+| ---   | ---  | ---      | ---     | ---         |
+| `loadBalancer` | _[LoadBalancer](#loadbalancer)_ |  false  |  | LoadBalancer policy to apply when routing traffic from the gateway to<br />the backend endpoints. Defaults to `LeastRequest`. |
+| `proxyProtocol` | _[ProxyProtocol](#proxyprotocol)_ |  false  |  | ProxyProtocol enables the Proxy Protocol when communicating with the backend. |
+| `tcpKeepalive` | _[TCPKeepalive](#tcpkeepalive)_ |  false  |  | TcpKeepalive settings associated with the upstream client connection.<br />Disabled by default. |
+| `healthCheck` | _[HealthCheck](#healthcheck)_ |  false  |  | HealthCheck allows gateway to perform active health checking on backends. |
+| `circuitBreaker` | _[CircuitBreaker](#circuitbreaker)_ |  false  |  | Circuit Breaker settings for the upstream connections and requests.<br />If not set, circuit breakers will be enabled with the default thresholds |
+| `timeout` | _[Timeout](#timeout)_ |  false  |  | Timeout settings for the backend connections. |
+| `connection` | _[BackendConnection](#backendconnection)_ |  false  |  | Connection includes backend connection settings. |
+| `dns` | _[DNS](#dns)_ |  false  |  | DNS includes dns resolution settings. |
+| `http2` | _[HTTP2Settings](#http2settings)_ |  false  |  | HTTP2 provides HTTP/2 configuration for backend connections. |
 
 
 #### BackendSpec
@@ -573,7 +597,6 @@ _Appears in:_
 | `targetRefs` | _LocalPolicyTargetReferenceWithSectionName array_ |  true  |  | TargetRefs are the names of the Gateway resources this policy<br />is being attached to. |
 | `targetSelectors` | _[TargetSelector](#targetselector) array_ |  true  |  | TargetSelectors allow targeting resources for this policy based on labels |
 | `loadBalancer` | _[LoadBalancer](#loadbalancer)_ |  false  |  | LoadBalancer policy to apply when routing traffic from the gateway to<br />the backend endpoints. Defaults to `LeastRequest`. |
-| `retry` | _[Retry](#retry)_ |  false  |  | Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.<br />If not set, retry will be disabled. |
 | `proxyProtocol` | _[ProxyProtocol](#proxyprotocol)_ |  false  |  | ProxyProtocol enables the Proxy Protocol when communicating with the backend. |
 | `tcpKeepalive` | _[TCPKeepalive](#tcpkeepalive)_ |  false  |  | TcpKeepalive settings associated with the upstream client connection.<br />Disabled by default. |
 | `healthCheck` | _[HealthCheck](#healthcheck)_ |  false  |  | HealthCheck allows gateway to perform active health checking on backends. |
@@ -582,6 +605,7 @@ _Appears in:_
 | `connection` | _[BackendConnection](#backendconnection)_ |  false  |  | Connection includes backend connection settings. |
 | `dns` | _[DNS](#dns)_ |  false  |  | DNS includes dns resolution settings. |
 | `http2` | _[HTTP2Settings](#http2settings)_ |  false  |  | HTTP2 provides HTTP/2 configuration for backend connections. |
+| `retry` | _[Retry](#retry)_ |  false  |  | Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.<br />If not set, retry will be disabled. |
 | `mergeType` | _[MergeType](#mergetype)_ |  false  |  | MergeType determines how this configuration is merged with existing BackendTrafficPolicy<br />configurations targeting a parent resource. When set, this configuration will be merged<br />into a parent BackendTrafficPolicy (i.e. the one targeting a Gateway or Listener).<br />This field cannot be set when targeting a parent resource (Gateway).<br />If unset, no merging occurs, and only the most specific configuration takes effect. |
 | `rateLimit` | _[RateLimitSpec](#ratelimitspec)_ |  false  |  | RateLimit allows the user to limit the number of incoming requests<br />to a predefined value based on attributes within the traffic flow. |
 | `bandwidthLimit` | _[BandwidthLimitSpec](#bandwidthlimitspec)_ |  false  |  | BandwidthLimit allows the user to limit the bandwidth of traffic<br />sent to and received from the backend. |
@@ -832,6 +856,7 @@ _Appears in:_
 CircuitBreaker defines the Circuit Breaker configuration.
 
 _Appears in:_
+- [BackendSettings](#backendsettings)
 - [BackendTrafficPolicySpec](#backendtrafficpolicyspec)
 - [ClusterSettings](#clustersettings)
 
@@ -1041,7 +1066,8 @@ _Appears in:_
 
 
 ClusterSettings provides the various knobs that can be set to control how traffic to a given
-backend will be configured.
+backend will be configured. It embeds BackendSettings (CDS-only fields) and adds
+route-level fields like Retry.
 
 _Appears in:_
 - [ALSEnvoyProxyAccessLog](#alsenvoyproxyaccesslog)
@@ -1059,7 +1085,6 @@ _Appears in:_
 | Field | Type | Required | Default | Description |
 | ---   | ---  | ---      | ---     | ---         |
 | `loadBalancer` | _[LoadBalancer](#loadbalancer)_ |  false  |  | LoadBalancer policy to apply when routing traffic from the gateway to<br />the backend endpoints. Defaults to `LeastRequest`. |
-| `retry` | _[Retry](#retry)_ |  false  |  | Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.<br />If not set, retry will be disabled. |
 | `proxyProtocol` | _[ProxyProtocol](#proxyprotocol)_ |  false  |  | ProxyProtocol enables the Proxy Protocol when communicating with the backend. |
 | `tcpKeepalive` | _[TCPKeepalive](#tcpkeepalive)_ |  false  |  | TcpKeepalive settings associated with the upstream client connection.<br />Disabled by default. |
 | `healthCheck` | _[HealthCheck](#healthcheck)_ |  false  |  | HealthCheck allows gateway to perform active health checking on backends. |
@@ -1068,6 +1093,7 @@ _Appears in:_
 | `connection` | _[BackendConnection](#backendconnection)_ |  false  |  | Connection includes backend connection settings. |
 | `dns` | _[DNS](#dns)_ |  false  |  | DNS includes dns resolution settings. |
 | `http2` | _[HTTP2Settings](#http2settings)_ |  false  |  | HTTP2 provides HTTP/2 configuration for backend connections. |
+| `retry` | _[Retry](#retry)_ |  false  |  | Retry provides more advanced usage, allowing users to customize the number of retries, retry fallback strategy, and retry triggering conditions.<br />If not set, retry will be disabled. |
 
 
 #### ClusterTranslationConfig
@@ -1399,6 +1425,7 @@ _Appears in:_
 
 
 _Appears in:_
+- [BackendSettings](#backendsettings)
 - [BackendTrafficPolicySpec](#backendtrafficpolicyspec)
 - [ClusterSettings](#clustersettings)
 
@@ -2909,6 +2936,7 @@ _Appears in:_
 HTTP2Settings provides HTTP/2 configuration for listeners and backends.
 
 _Appears in:_
+- [BackendSettings](#backendsettings)
 - [BackendTrafficPolicySpec](#backendtrafficpolicyspec)
 - [ClientTrafficPolicySpec](#clienttrafficpolicyspec)
 - [ClusterSettings](#clustersettings)
@@ -3326,6 +3354,7 @@ HealthCheck configuration to decide which endpoints
 are healthy and can be used for routing.
 
 _Appears in:_
+- [BackendSettings](#backendsettings)
 - [BackendTrafficPolicySpec](#backendtrafficpolicyspec)
 - [ClusterSettings](#clustersettings)
 
@@ -3952,6 +3981,7 @@ _Appears in:_
 LoadBalancer defines the load balancer policy to be applied.
 
 _Appears in:_
+- [BackendSettings](#backendsettings)
 - [BackendTrafficPolicySpec](#backendtrafficpolicyspec)
 - [ClusterSettings](#clustersettings)
 
@@ -4917,6 +4947,7 @@ ProxyProtocol defines the configuration related to the proxy protocol
 when communicating with the backend.
 
 _Appears in:_
+- [BackendSettings](#backendsettings)
 - [BackendTrafficPolicySpec](#backendtrafficpolicyspec)
 - [ClusterSettings](#clustersettings)
 
@@ -6085,6 +6116,7 @@ _Appears in:_
 TCPKeepalive define the TCP Keepalive configuration.
 
 _Appears in:_
+- [BackendSettings](#backendsettings)
 - [BackendTrafficPolicySpec](#backendtrafficpolicyspec)
 - [ClientTrafficPolicySpec](#clienttrafficpolicyspec)
 - [ClusterSettings](#clustersettings)
@@ -6228,6 +6260,7 @@ _Appears in:_
 Timeout defines configuration for timeouts related to connections.
 
 _Appears in:_
+- [BackendSettings](#backendsettings)
 - [BackendTrafficPolicySpec](#backendtrafficpolicyspec)
 - [ClusterSettings](#clustersettings)
 
