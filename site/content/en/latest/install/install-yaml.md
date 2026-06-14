@@ -41,6 +41,15 @@ Gateway API resources, use a compatible Gateway API CRD installation method befo
 
 Some manual migration steps are required to upgrade Envoy Gateway.
 
+{{% alert title="Note" color="primary" %}}
+The `helm upgrade` command in step 2 requires a prior Envoy Gateway release to already be deployed in the cluster.
+If Envoy Gateway is **not** currently installed, run `helm install` instead of `helm upgrade`:
+
+```shell
+helm install eg oci://docker.io/envoyproxy/gateway-helm --version {{< yaml-version >}} -n envoy-gateway-system --create-namespace
+```
+{{% /alert %}}
+
 1. Update Gateway-API and Envoy Gateway CRDs:
 
 ```shell
