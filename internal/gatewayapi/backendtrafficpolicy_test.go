@@ -246,6 +246,52 @@ func TestBuildTrafficFeaturesRejectsRequestBufferWithHTTPUpgrade(t *testing.T) {
 	})
 }
 
+func TestBuildTrafficFeaturesRejectsRequestBufferWithDecompressor(t *testing.T) {
+	t.Run("same policy", func(t *testing.T) {
+		tr := &Translator{}
+		policy := &egv1a1.BackendTrafficPolicy{
+			Spec: egv1a1.BackendTrafficPolicySpec{
+				RequestBuffer: &egv1a1.RequestBuffer{
+					Limit: resource.MustParse("1Mi"),
+				},
+				Decompressor: []*egv1a1.Decompressor{
+					{Type: egv1a1.GzipDecompressorType},
+				},
+			},
+		}
+
+		tf, err := tr.buildTrafficFeatures(policy)
+		require.ErrorContains(t, err, "RequestBuffer: requestBuffer cannot be used together with decompressor")
+		require.NotNil(t, tf)
+	})
+
+	t.Run("merged policy", func(t *testing.T) {
+		tr := &Translator{}
+		parentPolicy := &egv1a1.BackendTrafficPolicy{
+			Spec: egv1a1.BackendTrafficPolicySpec{
+				RequestBuffer: &egv1a1.RequestBuffer{
+					Limit: resource.MustParse("1Mi"),
+				},
+			},
+		}
+		routePolicy := &egv1a1.BackendTrafficPolicy{
+			Spec: egv1a1.BackendTrafficPolicySpec{
+				MergeType: new(egv1a1.StrategicMerge),
+				Decompressor: []*egv1a1.Decompressor{
+					{Type: egv1a1.GzipDecompressorType},
+				},
+			},
+		}
+
+		mergedPolicy, err := tr.mergeBackendTrafficPolicy(routePolicy, parentPolicy)
+		require.NoError(t, err)
+
+		tf, err := tr.buildTrafficFeatures(mergedPolicy)
+		require.ErrorContains(t, err, "RequestBuffer: requestBuffer cannot be used together with decompressor")
+		require.NotNil(t, tf)
+	})
+}
+
 func TestBuildPassiveHealthCheck(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -451,6 +497,66 @@ func TestBuildCompression(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := buildCompression(tc.compression, tc.compressor)
+			require.Equal(t, tc.expected, got)
+		})
+	}
+}
+
+func TestBuildDecompressor(t *testing.T) {
+	cases := []struct {
+		name         string
+		decompressor []*egv1a1.Decompressor
+		expected     []*ir.Decompressor
+	}{
+		{
+			name:         "nil decompressor",
+			decompressor: nil,
+			expected:     nil,
+		},
+		{
+			name:         "empty decompressor",
+			decompressor: []*egv1a1.Decompressor{},
+			expected:     nil,
+		},
+		{
+			name: "single gzip decompressor",
+			decompressor: []*egv1a1.Decompressor{
+				{Type: egv1a1.GzipDecompressorType},
+			},
+			expected: []*ir.Decompressor{
+				{Type: egv1a1.GzipDecompressorType},
+			},
+		},
+		{
+			name: "multiple decompressor types",
+			decompressor: []*egv1a1.Decompressor{
+				{Type: egv1a1.GzipDecompressorType},
+				{Type: egv1a1.BrotliDecompressorType},
+				{Type: egv1a1.ZstdDecompressorType},
+			},
+			expected: []*ir.Decompressor{
+				{Type: egv1a1.GzipDecompressorType},
+				{Type: egv1a1.BrotliDecompressorType},
+				{Type: egv1a1.ZstdDecompressorType},
+			},
+		},
+		{
+			name: "decompressor with optional config",
+			decompressor: []*egv1a1.Decompressor{
+				{
+					Type: egv1a1.GzipDecompressorType,
+					Gzip: &egv1a1.GzipDecompressor{},
+				},
+			},
+			expected: []*ir.Decompressor{
+				{Type: egv1a1.GzipDecompressorType},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := buildDecompressor(tc.decompressor)
 			require.Equal(t, tc.expected, got)
 		})
 	}

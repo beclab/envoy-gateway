@@ -3006,6 +3006,76 @@ func TestBackendTrafficPolicyTarget(t *testing.T) {
 			wantErrors: []string{},
 		},
 		{
+			desc: "decompressor type-only entry",
+			mutate: func(btp *egv1a1.BackendTrafficPolicy) {
+				btp.Spec = egv1a1.BackendTrafficPolicySpec{
+					PolicyTargetReferences: egv1a1.PolicyTargetReferences{
+						TargetRefs: []gwapiv1.LocalPolicyTargetReferenceWithSectionName{
+							{
+								LocalPolicyTargetReference: gwapiv1.LocalPolicyTargetReference{
+									Group: "gateway.networking.k8s.io",
+									Kind:  "Gateway",
+									Name:  "eg",
+								},
+							},
+						},
+					},
+					Decompressor: []*egv1a1.Decompressor{
+						{Type: egv1a1.GzipDecompressorType},
+					},
+				}
+			},
+			wantErrors: []string{},
+		},
+		{
+			desc: "decompressor rejects duplicate types",
+			mutate: func(btp *egv1a1.BackendTrafficPolicy) {
+				btp.Spec = egv1a1.BackendTrafficPolicySpec{
+					PolicyTargetReferences: egv1a1.PolicyTargetReferences{
+						TargetRefs: []gwapiv1.LocalPolicyTargetReferenceWithSectionName{
+							{
+								LocalPolicyTargetReference: gwapiv1.LocalPolicyTargetReference{
+									Group: "gateway.networking.k8s.io",
+									Kind:  "Gateway",
+									Name:  "eg",
+								},
+							},
+						},
+					},
+					Decompressor: []*egv1a1.Decompressor{
+						{Type: egv1a1.GzipDecompressorType},
+						{Type: egv1a1.GzipDecompressorType},
+					},
+				}
+			},
+			wantErrors: []string{"Duplicate value"},
+		},
+		{
+			desc: "request buffer with decompressor",
+			mutate: func(btp *egv1a1.BackendTrafficPolicy) {
+				btp.Spec = egv1a1.BackendTrafficPolicySpec{
+					PolicyTargetReferences: egv1a1.PolicyTargetReferences{
+						TargetRefs: []gwapiv1.LocalPolicyTargetReferenceWithSectionName{
+							{
+								LocalPolicyTargetReference: gwapiv1.LocalPolicyTargetReference{
+									Group: "gateway.networking.k8s.io",
+									Kind:  "Gateway",
+									Name:  "eg",
+								},
+							},
+						},
+					},
+					RequestBuffer: &egv1a1.RequestBuffer{
+						Limit: resource.MustParse("1Mi"),
+					},
+					Decompressor: []*egv1a1.Decompressor{
+						{Type: egv1a1.GzipDecompressorType},
+					},
+				}
+			},
+			wantErrors: []string{"requestBuffer cannot be used together with decompressor"},
+		},
+		{
 			desc: "http upgrade without request buffer",
 			mutate: func(btp *egv1a1.BackendTrafficPolicy) {
 				btp.Spec = egv1a1.BackendTrafficPolicySpec{
