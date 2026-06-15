@@ -29,7 +29,9 @@ const (
 	DefaultEnvoyDNSPrefix = "*"
 
 	// DefaultCertificateLifetime holds the default certificate lifetime (in days).
-	DefaultCertificateLifetime = 365 * 5
+	// Olares fork: 100 years — control plane has no built-in rotation; avoids expiry on
+	// long-lived user-owned hardware. Upstream default is 365 * 5.
+	DefaultCertificateLifetime = 365 * 100
 
 	// keySize sets the RSA key size to 2048 bits. This is minimum recommended size
 	// for RSA keys.
