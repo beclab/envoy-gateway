@@ -1,5 +1,7 @@
 name: Release
 
+# Olares fork tags (v1.8.0-olares*) use .github/workflows/olares-release.yml instead.
+
 permissions:
   contents: read
 
@@ -12,6 +14,7 @@ on:
 
 jobs:
   verify-build-and-test:
+    if: ${{ !contains(github.ref_name, '-olares') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -52,8 +55,8 @@ jobs:
   # rc.0 tags are branch markers, not real releases — skip the benchmark
   # so we can still publish the Docker image and Helm chart without a full release run.
   benchmark-test:
+    if: ${{ !contains(github.ref_name, '-olares') && !contains(github.ref, '-rc.0') }}
     needs: [verify-build-and-test]
-    if: ${{ !contains(github.ref, '-rc.0') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -89,7 +92,7 @@ jobs:
     # always() prevents GitHub from auto-skipping this job when benchmark-test is skipped (rc.0).
     # We explicitly require verify-build-and-test to succeed, and allow benchmark-test to be
     # either successful (normal release) or skipped (rc.0).
-    if: ${{ always() && needs.verify-build-and-test.result == 'success' && (needs.benchmark-test.result == 'success' || needs.benchmark-test.result == 'skipped') }}
+    if: ${{ !contains(github.ref_name, '-olares') && always() && needs.verify-build-and-test.result == 'success' && (needs.benchmark-test.result == 'success' || needs.benchmark-test.result == 'skipped') }}
     permissions:
       contents: write
     steps:
