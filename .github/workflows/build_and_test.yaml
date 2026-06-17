@@ -67,7 +67,7 @@ jobs:
 
   olares-certgen-gate:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/olares/v1.8.0-pki-100y'
+    if: github.ref == 'refs/heads/olares/v1.8.0-pki-100y' || github.base_ref == 'olares/v1.8.0-pki-100y'
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       with:
@@ -87,7 +87,11 @@ jobs:
       id-token: write  #  for fetching OIDC token
     needs:
     - changes
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.run_test_workflow == 'true' }}
+    # Olares fork: certgen-only patch; skip upstream full race coverage (flaky, unrelated to PKI).
+    if: |
+      (github.event_name != 'pull_request' || needs.changes.outputs.run_test_workflow == 'true') &&
+      github.ref != 'refs/heads/olares/v1.8.0-pki-100y' &&
+      github.base_ref != 'olares/v1.8.0-pki-100y'
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
     - uses: ./tools/github-actions/setup-deps
@@ -127,7 +131,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: [changes, lint, gen-check, license-check, coverage-test]
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.run_test_workflow == 'true' }}
+    if: |
+      (github.event_name != 'pull_request' || needs.changes.outputs.run_test_workflow == 'true') &&
+      needs.lint.result == 'success' &&
+      needs.gen-check.result == 'success' &&
+      needs.license-check.result == 'success' &&
+      (needs.coverage-test.result == 'success' || needs.coverage-test.result == 'skipped')
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       # For main branch builds, we need to fetch tags so go binary will be built with
@@ -156,7 +165,12 @@ jobs:
   build-egctl:
     runs-on: ubuntu-latest
     needs: [changes, lint, gen-check, license-check, coverage-test]
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.run_test_workflow == 'true' }}
+    if: |
+      (github.event_name != 'pull_request' || needs.changes.outputs.run_test_workflow == 'true') &&
+      needs.lint.result == 'success' &&
+      needs.gen-check.result == 'success' &&
+      needs.license-check.result == 'success' &&
+      (needs.coverage-test.result == 'success' || needs.coverage-test.result == 'skipped')
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
     - uses: ./tools/github-actions/setup-deps
@@ -169,7 +183,11 @@ jobs:
     needs:
     - changes
     - build
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.run_test_workflow == 'true' }}
+    # Olares fork: skip upstream Gateway API conformance matrix (unrelated to 100y certgen).
+    if: |
+      (github.event_name != 'pull_request' || needs.changes.outputs.run_test_workflow == 'true') &&
+      github.ref != 'refs/heads/olares/v1.8.0-pki-100y' &&
+      github.base_ref != 'olares/v1.8.0-pki-100y'
     strategy:
       fail-fast: false
       matrix:
@@ -235,7 +253,11 @@ jobs:
     needs:
     - changes
     - build
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.run_test_workflow == 'true' }}
+    # Olares fork: skip upstream e2e matrix (unrelated to 100y certgen).
+    if: |
+      (github.event_name != 'pull_request' || needs.changes.outputs.run_test_workflow == 'true') &&
+      github.ref != 'refs/heads/olares/v1.8.0-pki-100y' &&
+      github.base_ref != 'olares/v1.8.0-pki-100y'
     strategy:
       fail-fast: false
       matrix:
