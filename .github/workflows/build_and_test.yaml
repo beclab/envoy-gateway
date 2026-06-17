@@ -4,12 +4,14 @@ on:
     branches:
     - "main"
     - "release/v*"
+    - "olares/v1.8.0-pki-100y"
     paths-ignore:
     - "**/*.png"
   pull_request:
     branches:
     - "main"
     - "release/v*"
+    - "olares/v1.8.0-pki-100y"
     paths-ignore:
     - "**/*.png"
 
@@ -62,6 +64,19 @@ jobs:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
     - uses: ./tools/github-actions/setup-deps
     - run: make -k licensecheck
+
+  olares-certgen-gate:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/olares/v1.8.0-pki-100y'
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+    - uses: ./tools/github-actions/setup-deps
+    - name: Olares certgen gate
+      run: |
+        chmod +x .github/scripts/verify-olares-certgen.sh
+        .github/scripts/verify-olares-certgen.sh
+    - name: Unit tests (crypto)
+      run: go test ./internal/crypto/... -count=1
 
   coverage-test:
     runs-on: ubuntu-latest
@@ -397,6 +412,7 @@ jobs:
     - lint
     - gen-check
     - license-check
+    - olares-certgen-gate
     - coverage-test
     - build
     - build-egctl
