@@ -1,384 +1,118 @@
-# Olares EG fork — multi-arch control-plane image: push to beclab registry + GitHub Release tar.
-#
-# Trigger: git push tag v1.8.0-olares*  (e.g. v1.8.0-olares.1)
-# Output:
-#   docker.io/beclab/envoy-gateway:<tag>  (multi-arch manifest)
-#   GitHub Release assets:
-#     envoy-gateway-<tag>-linux-amd64.tar   (docker save / OCI archive)
-#     envoy-gateway-<tag>-linux-arm64.tar
-#     release-notes.md (+ EG-FORK.lock snippet in body)
-#
-# Registry push: Olares beclab/* pattern (module_appservice_publish_docker.yaml):
-#   amd64 on ubuntu-latest + arm64 on self-hosted + docker manifest merge.
-# Do NOT call make image.multiarch.setup (recreates buildx and drops Hub auth).
-#
-# Branch olares/v1.8.0-pki-100y: verify + compile only.
-# Upstream release.yaml skips tags containing "-olares".
-name: Olares EG image release
+name: Release
 
-on:
-  push:
-    branches:
-      - olares/v1.8.0-pki-100y
-    tags:
-      - 'v1.8.0-olares*'
-  workflow_dispatch:
-    inputs:
-      ref:
-        description: 'Git tag to release (e.g. v1.8.0-olares.1)'
-        required: true
-        default: 'v1.8.0-olares.1'
+# Olares fork tags (v1.8.0-olares*) — upstream release.yaml skips -olares tags.
 
 permissions:
   contents: read
 
-env:
-  UPSTREAM_TAG: v1.8.0
-  UPSTREAM_COMMIT: f7306b38f1ec3551cdbcb33ea01ad0903f9157fa
-  IMAGE_REPO: beclab/envoy-gateway
-  IMAGE: docker.io/beclab/envoy-gateway
+on:
+  push:
+    tags:
+      - 'v1.8.0-olares*'
 
 jobs:
-  verify:
-    name: Verify patch (100y certgen)
+  verify-build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Olares certgen gate
-        run: |
-          chmod +x .github/scripts/verify-olares-certgen.sh
-          .github/scripts/verify-olares-certgen.sh
-
-      - name: Unit tests
-        run: go test ./internal/crypto/... -count=1
-
-  build-binaries:
-    name: Build linux amd64/arm64
-    needs: verify
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: make build-multiarch
-        run: make build-multiarch BINS=envoy-gateway PLATFORMS="linux_amd64 linux_arm64"
-
-      - name: Sanity check
-        run: file bin/linux/amd64/envoy-gateway bin/linux/arm64/envoy-gateway
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: envoy-gateway-bin-linux-${{ github.run_number }}
-          path: bin/linux/
-          retention-days: 14
-
-  resolve-meta:
-    name: Resolve release tag
-    if: startsWith(github.ref, 'refs/tags/v1.8.0-olares') || (github.event_name == 'workflow_dispatch' && startsWith(inputs.ref, 'v1.8.0-olares'))
-    needs: verify
-    runs-on: ubuntu-latest
-    outputs:
-      image_tag: ${{ steps.meta.outputs.image_tag }}
-      git_commit: ${{ steps.meta.outputs.git_commit }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
-
-      - name: Resolve tag and commit
-        id: meta
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            TAG="${{ inputs.ref }}"
-          else
-            TAG="${GITHUB_REF_NAME}"
-          fi
-          echo "image_tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "git_commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-  publish_dockerhub_amd64:
-    name: Push amd64 image to Docker Hub
-    if: startsWith(github.ref, 'refs/tags/v1.8.0-olares') || (github.event_name == 'workflow_dispatch' && startsWith(inputs.ref, 'v1.8.0-olares'))
-    needs: [build-binaries, resolve-meta]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: envoy-gateway-bin-linux-${{ github.run_number }}
-          path: bin/linux
-
-      - name: Verify Docker Hub secrets present
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - name: Verify Build and Test Success
         env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_PASS }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [[ -z "${DOCKERHUB_USERNAME}" ]]; then
-            echo "::error::Secret DOCKERHUB_USERNAME is missing. Add org/repo Actions secret (beclab/*)." >&2
+          RUN=$(gh run list \
+            --workflow build_and_test.yaml \
+            --commit ${{ github.sha }} \
+            --limit 1 \
+            --json status,conclusion \
+            --jq '.[0]')
+
+          if [ -z "$RUN" ] || [ "$RUN" = "null" ]; then
+            echo "❌ ERROR: No 'Build and Test' workflow run found for this commit."
             exit 1
           fi
-          if [[ -z "${DOCKERHUB_PASS}" ]]; then
-            echo "::error::Secret DOCKERHUB_PASS is missing. Add org/repo Actions secret (beclab/*)." >&2
+
+          STATUS=$(echo "$RUN" | jq -r '.status')
+          CONCLUSION=$(echo "$RUN" | jq -r '.conclusion')
+          echo "Latest 'Build and Test' run: status=$STATUS, conclusion=$CONCLUSION"
+
+          if [ "$STATUS" != "completed" ]; then
+            echo "❌ ERROR: The latest 'Build and Test' workflow run is still $STATUS."
             exit 1
           fi
-          echo "Docker Hub login user: ${DOCKERHUB_USERNAME}"
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASS }}
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "❌ ERROR: The latest 'Build and Test' workflow run concluded with: $CONCLUSION"
+            exit 1
+          fi
 
-      - name: Build and push amd64 image
-        uses: docker/build-push-action@v3
-        with:
-          context: bin
-          file: tools/docker/envoy-gateway/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: beclab/envoy-gateway:${{ needs.resolve-meta.outputs.image_tag }}-amd64
-          sbom: false
-          provenance: false
+          echo "✅ SUCCESS: The latest 'Build and Test' workflow succeeded."
 
-  publish_dockerhub_arm64:
-    name: Push arm64 image to Docker Hub
-    if: startsWith(github.ref, 'refs/tags/v1.8.0-olares') || (github.event_name == 'workflow_dispatch' && startsWith(inputs.ref, 'v1.8.0-olares'))
-    needs: [build-binaries, resolve-meta]
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: envoy-gateway-bin-linux-${{ github.run_number }}
-          path: bin/linux
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASS }}
-
-      - name: Build and push arm64 image
-        uses: docker/build-push-action@v3
-        with:
-          context: bin
-          file: tools/docker/envoy-gateway/Dockerfile
-          platforms: linux/arm64
-          push: true
-          tags: beclab/envoy-gateway:${{ needs.resolve-meta.outputs.image_tag }}-arm64
-          sbom: false
-          provenance: false
-
-  publish_manifest:
-    name: Push multi-arch manifest to Docker Hub
-    if: startsWith(github.ref, 'refs/tags/v1.8.0-olares') || (github.event_name == 'workflow_dispatch' && startsWith(inputs.ref, 'v1.8.0-olares'))
-    needs: [publish_dockerhub_amd64, publish_dockerhub_arm64, resolve-meta]
+  release:
     runs-on: ubuntu-latest
-    steps:
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASS }}
-
-      - name: Push manifest
-        env:
-          TAG: ${{ needs.resolve-meta.outputs.image_tag }}
-        run: |
-          docker manifest create "beclab/envoy-gateway:${TAG}" \
-            --amend "beclab/envoy-gateway:${TAG}-amd64" \
-            --amend "beclab/envoy-gateway:${TAG}-arm64"
-          docker manifest push "beclab/envoy-gateway:${TAG}"
-          echo "Pushed docker.io/beclab/envoy-gateway:${TAG}"
-
-  github-release:
-    name: GitHub Release (per-arch tar + notes)
-    if: startsWith(github.ref, 'refs/tags/v1.8.0-olares') || (github.event_name == 'workflow_dispatch' && startsWith(inputs.ref, 'v1.8.0-olares'))
-    needs: [publish_manifest, resolve-meta]
-    runs-on: ubuntu-latest
+    needs: [verify-build-and-test]
+    if: ${{ needs.verify-build-and-test.result == 'success' }}
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: ./tools/github-actions/reclaim-storage
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - name: Extract Release Tag and Commit SHA
+        id: vars
+        shell: bash
+        run: |
+          {
+            echo "release_tag=${GITHUB_REF##*/}"
+            echo "without_v_release_tag=${GITHUB_REF##*/v}"
+            echo "sha_short=$(git rev-parse --short HEAD)"
+          } >> "$GITHUB_ENV"
+
+      - name: Login to DockerHub
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASS }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Build multiarch binaries
+        run: make build-multiarch
 
-      - name: Inspect registry per-arch digests
-        id: registry
-        env:
-          TAG: ${{ needs.resolve-meta.outputs.image_tag }}
+      - name: Build and push multiarch image
+        run: make image.multiarch.setup image.push.multiarch TAG=${{ env.release_tag }} IMAGE=docker.io/beclab/envoy-gateway
+
+      - name: Generate Release Artifacts
+        run: IMAGE_PULL_POLICY=IfNotPresent make generate-artifacts IMAGE=beclab/gateway TAG=${{ env.release_tag }} OUTPUT_DIR=release-artifacts
+
+      - name: Build and Push EG Release Helm Chart
         run: |
-          AMD64_DIGEST="$(docker buildx imagetools inspect "${IMAGE}:${TAG}" \
-            --format '{{range .Manifest.Manifests}}{{if eq .Platform.Architecture "amd64"}}{{.Digest}}{{end}}{{end}}')"
-          ARM64_DIGEST="$(docker buildx imagetools inspect "${IMAGE}:${TAG}" \
-            --format '{{range .Manifest.Manifests}}{{if eq .Platform.Architecture "arm64"}}{{.Digest}}{{end}}{{end}}')"
-          test -n "${AMD64_DIGEST}"
-          test -n "${ARM64_DIGEST}"
-          {
-            echo "amd64_digest=${AMD64_DIGEST}"
-            echo "arm64_digest=${ARM64_DIGEST}"
-          } >> "${GITHUB_OUTPUT}"
-          echo "registry amd64 ${AMD64_DIGEST}"
-          echo "registry arm64 ${ARM64_DIGEST}"
+          IMAGE_PULL_POLICY=IfNotPresent OCI_REGISTRY=oci://docker.io/beclab CHART_VERSION=${{ env.release_tag }} IMAGE=docker.io/beclab/envoy-gateway TAG=${{ env.release_tag }} make helm-package helm-push
+          IMAGE_PULL_POLICY=IfNotPresent OCI_REGISTRY=oci://docker.io/beclab CHART_VERSION=${{ env.without_v_release_tag }} IMAGE=docker.io/beclab/envoy-gateway TAG=${{ env.release_tag }} make helm-package helm-push
 
-      - name: Install skopeo
-        run: sudo apt-get update && sudo apt-get install -y skopeo
-
-      - name: Export amd64 image tar from registry
-        env:
-          TAG: ${{ needs.resolve-meta.outputs.image_tag }}
+      - name: Package EG multiarch binaries
         run: |
-          mkdir -p dist
-          skopeo copy \
-            "docker://docker.io/beclab/envoy-gateway:${TAG}-amd64" \
-            "docker-archive:dist/envoy-gateway-${TAG}-linux-amd64.tar"
+          tar -zcvf envoy-gateway_${{ env.release_tag }}_linux_amd64.tar.gz bin/linux/amd64/envoy-gateway
+          tar -zcvf envoy-gateway_${{ env.release_tag }}_linux_arm64.tar.gz bin/linux/arm64/envoy-gateway
+          tar -zcvf envoy-gateway_${{ env.release_tag }}_darwin_amd64.tar.gz bin/darwin/amd64/envoy-gateway
+          tar -zcvf envoy-gateway_${{ env.release_tag }}_darwin_arm64.tar.gz bin/darwin/arm64/envoy-gateway
+          tar -zcvf egctl_${{ env.release_tag }}_linux_amd64.tar.gz bin/linux/amd64/egctl
+          tar -zcvf egctl_${{ env.release_tag }}_linux_arm64.tar.gz bin/linux/arm64/egctl
+          tar -zcvf egctl_${{ env.release_tag }}_darwin_amd64.tar.gz bin/darwin/amd64/egctl
+          tar -zcvf egctl_${{ env.release_tag }}_darwin_arm64.tar.gz bin/darwin/arm64/egctl
+          zip -r egctl_${{ env.release_tag }}_windows_amd64.zip bin/windows/amd64/egctl
 
-      - name: Export arm64 image tar from registry
-        env:
-          TAG: ${{ needs.resolve-meta.outputs.image_tag }}
-        run: |
-          skopeo copy \
-            "docker://docker.io/beclab/envoy-gateway:${TAG}-arm64" \
-            "docker-archive:dist/envoy-gateway-${TAG}-linux-arm64.tar"
-
-      - name: Inspect archives (digest per arch, cross-check)
-        id: inspect
-        env:
-          TAG: ${{ needs.resolve-meta.outputs.image_tag }}
-        run: |
-          chmod +x .github/scripts/inspect-image-archives.sh
-          .github/scripts/inspect-image-archives.sh dist "${TAG}"
-
-      - name: Cross-check registry vs tar digests
-        env:
-          REG_AMD64: ${{ steps.registry.outputs.amd64_digest }}
-          REG_ARM64: ${{ steps.registry.outputs.arm64_digest }}
-          TAR_AMD64: ${{ steps.inspect.outputs.amd64_digest }}
-          TAR_ARM64: ${{ steps.inspect.outputs.arm64_digest }}
-        run: |
-          if [[ "${TAR_AMD64}" != "${REG_AMD64}" || "${TAR_ARM64}" != "${REG_ARM64}" ]]; then
-            echo "WARN: tar digest differs from registry" >&2
-            echo "  amd64 tar=${TAR_AMD64} registry=${REG_AMD64}" >&2
-            echo "  arm64 tar=${TAR_ARM64} registry=${REG_ARM64}" >&2
-          else
-            echo "OK: registry and tar digests match"
-          fi
-
-      - name: Write release notes
-        env:
-          TAG: ${{ needs.resolve-meta.outputs.image_tag }}
-          COMMIT: ${{ needs.resolve-meta.outputs.git_commit }}
-          AMD64_DIGEST: ${{ steps.registry.outputs.amd64_digest }}
-          ARM64_DIGEST: ${{ steps.registry.outputs.arm64_digest }}
-          AMD64_SHA256: ${{ steps.inspect.outputs.amd64_sha256 }}
-          ARM64_SHA256: ${{ steps.inspect.outputs.arm64_sha256 }}
-        run: |
-          cat > dist/release-notes.md <<EOF
-          ## Olares Envoy Gateway ${TAG}
-
-          Multi-arch **control-plane** image: pushed to **docker.io/beclab/envoy-gateway** and packaged as per-arch docker-archive tar on this Release.
-
-          | Field | Value |
-          | --- | --- |
-          | Git tag | \`${TAG}\` |
-          | Git commit | \`${COMMIT}\` |
-          | Upstream | \`${UPSTREAM_TAG}\` @ \`${UPSTREAM_COMMIT}\` |
-          | Registry | \`docker.io/beclab/envoy-gateway:${TAG}\` |
-          | certgen days | 36500 |
-
-          ### Release assets
-
-          | Platform | File | file sha256 |
-          | --- | --- | --- |
-          | linux/amd64 | \`envoy-gateway-${TAG}-linux-amd64.tar\` | \`${AMD64_SHA256}\` |
-          | linux/arm64 | \`envoy-gateway-${TAG}-linux-arm64.tar\` | \`${ARM64_SHA256}\` |
-
-          ### Image digest (per arch, registry — pin deploy from these)
-
-          | Platform | \`beclab/envoy-gateway\` digest |
-          | --- | --- |
-          | amd64 | \`${AMD64_DIGEST}\` |
-          | arm64 | \`${ARM64_DIGEST}\` |
-
-          ### Olares online pull
-
-          \`\`\`bash
-          docker pull docker.io/beclab/envoy-gateway:${TAG}
-          docker buildx imagetools inspect docker.io/beclab/envoy-gateway:${TAG}
-          \`\`\`
-
-          ### Olares offline import (vendor / release machine)
-
-          \`\`\`bash
-          # amd64 node example
-          skopeo copy docker-archive:envoy-gateway-${TAG}-linux-amd64.tar \\
-            docker-daemon:beclab/envoy-gateway:${TAG}
-          ctr -n k8s.io images import envoy-gateway-${TAG}-linux-amd64.tar
-          \`\`\`
-
-          Pin \`eg-control-plane.yaml\` (3 places) with per-arch \`@sha256:\` from the table above.
-
-          ### \`EG-FORK.lock.yaml\` snippet
-
-          \`\`\`yaml
-          upstream:
-            repo: https://github.com/envoyproxy/gateway
-            tag: ${UPSTREAM_TAG}
-            commit: ${UPSTREAM_COMMIT}
-          olares:
-            repo: https://github.com/beclab/envoy-gateway
-            branch: olares/v1.8.0-pki-100y
-            tag: ${TAG}
-            commit: "${COMMIT}"
-          image:
-            repository: beclab/envoy-gateway
-            registry: docker.io/beclab/envoy-gateway
-            tag: ${TAG}
-            release_assets:
-              amd64: envoy-gateway-${TAG}-linux-amd64.tar
-              arm64: envoy-gateway-${TAG}-linux-arm64.tar
-            digest_amd64: "${AMD64_DIGEST}"
-            digest_arm64: "${ARM64_DIGEST}"
-            built_from_commit: "${COMMIT}"
-          \`\`\`
-          EOF
-          cat dist/release-notes.md
-
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload Release Manifests
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v3.0.0
         with:
-          tag_name: ${{ needs.resolve-meta.outputs.image_tag }}
-          name: Olares EG ${{ needs.resolve-meta.outputs.image_tag }}
-          body_path: dist/release-notes.md
           files: |
-            dist/release-notes.md
-            dist/envoy-gateway-${{ needs.resolve-meta.outputs.image_tag }}-linux-amd64.tar
-            dist/envoy-gateway-${{ needs.resolve-meta.outputs.image_tag }}-linux-arm64.tar
+            release-artifacts/install.yaml
+            release-artifacts/quickstart.yaml
+            release-artifacts/envoy-gateway-crds.yaml
+            release-artifacts/release-notes.yaml
+            envoy-gateway_${{ env.release_tag }}_linux_amd64.tar.gz
+            envoy-gateway_${{ env.release_tag }}_linux_arm64.tar.gz
+            envoy-gateway_${{ env.release_tag }}_darwin_amd64.tar.gz
+            envoy-gateway_${{ env.release_tag }}_darwin_arm64.tar.gz
+            egctl_${{ env.release_tag }}_linux_amd64.tar.gz
+            egctl_${{ env.release_tag }}_linux_arm64.tar.gz
+            egctl_${{ env.release_tag }}_darwin_amd64.tar.gz
+            egctl_${{ env.release_tag }}_darwin_arm64.tar.gz
+            egctl_${{ env.release_tag }}_windows_amd64.zip

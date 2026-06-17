@@ -1,0 +1,25 @@
+date: June 17, 2026
+
+# Olares fork: beclab/envoy-gateway on branch olares/v1.8.0-pki-100y.
+# certgen default lifetime 36500 days (100 years) for first-install mTLS Secret longevity.
+breaking changes: |
+  Olares fork only: internal certgen default certificate lifetime is **36500 days** (100 years) instead of upstream 1825 days (5 years). No API or CRD changes.
+
+security updates: |
+
+new features: |
+  Olares fork: 100-year default lifetime for control-plane certgen-issued mTLS certificates (see internal/crypto/certgen.go patch on olares/v1.8.0-pki-100y).
+
+bug fixes: |
+
+# Performance improvements or optimizations.
+performance improvements: |
+
+# Deprecated features or APIs.
+deprecations: |
+
+# Other notable changes not covered by the above sections.
+Other changes: |
+  Based on upstream Envoy Gateway v1.8.0 (envoyproxy/gateway tag v1.8.0 @ f7306b38f1ec3551cdbcb33ea01ad0903f9157fa).
+  Container image: docker.io/beclab/envoy-gateway:v1.8.0-olares.1 (multi-arch amd64 + arm64).
+  Helm OCI: oci://docker.io/beclab (gateway-helm chart versions v1.8.0-olares.1 and 1.8.0-olares.1).
