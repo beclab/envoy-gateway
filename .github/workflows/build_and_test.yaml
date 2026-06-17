@@ -96,6 +96,7 @@ jobs:
     - name: Run Coverage Tests
       run: make go.test.coverage
     - name: Upload coverage to Codecov
+      if: github.ref != 'refs/heads/olares/v1.8.0-pki-100y' && github.base_ref != 'olares/v1.8.0-pki-100y'
       uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2  # v6.0.0
       with:
         fail_ci_if_error: true

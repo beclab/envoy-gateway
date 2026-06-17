@@ -21,8 +21,9 @@ fi
 # - current.yaml
 # - vX.Y.Z.yaml (e.g., v1.2.3.yaml)
 # - vX.Y.Z-rc.M.yaml (e.g., v1.0.0-rc.1.yaml)
+# - vX.Y.Z-olares.N.yaml (e.g., v1.8.0-olares.1.yaml) — Olares fork tags
 
-VALID_PATTERN='^(current|v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?)\.yaml$'
+VALID_PATTERN='^(current|v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+|-olares\.[0-9]+)?)\.yaml$'
 
 # Legacy files to ignore (grandfathered in)
 LEGACY_FILES=(
@@ -65,6 +66,7 @@ if [[ ${#INVALID_FILES[@]} -gt 0 ]]; then
     echo "  - current.yaml"
     echo "  - vX.Y.Z.yaml (e.g., v1.2.3.yaml)"
     echo "  - vX.Y.Z-rc.M.yaml (e.g., v1.0.0-rc.1.yaml)"
+    echo "  - vX.Y.Z-olares.N.yaml (e.g., v1.8.0-olares.1.yaml)"
     exit 1
 else
     echo "✅ All release notes filenames are valid"
