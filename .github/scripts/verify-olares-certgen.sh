@@ -4,6 +4,19 @@ set -euo pipefail
 
 UPSTREAM_COMMIT="${UPSTREAM_COMMIT:-f7306b38f1ec3551cdbcb33ea01ad0903f9157fa}"
 
+# Shallow CI checkouts (fetch-depth: 1) only contain HEAD; fetch the base commit first.
+if ! git cat-file -e "${UPSTREAM_COMMIT}^{commit}" 2>/dev/null; then
+  echo "Fetching upstream base commit ${UPSTREAM_COMMIT} (missing from shallow checkout)..."
+  if ! git fetch --no-tags --depth=1 origin "${UPSTREAM_COMMIT}" 2>/dev/null; then
+    BRANCH="${GITHUB_REF_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
+    git fetch --no-tags --deepen=16384 origin "${BRANCH}" || git fetch --no-tags --unshallow origin
+  fi
+  if ! git cat-file -e "${UPSTREAM_COMMIT}^{commit}" 2>/dev/null; then
+    echo "FAIL: upstream base commit ${UPSTREAM_COMMIT} not available after fetch" >&2
+    exit 1
+  fi
+fi
+
 HEAD="$(git rev-parse HEAD)"
 git merge-base --is-ancestor "${UPSTREAM_COMMIT}" HEAD
 
