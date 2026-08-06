@@ -123,3 +123,58 @@ func TestHttpServiceWithTimeout(t *testing.T) {
 		})
 	}
 }
+
+func TestHttpServicePassesClientRedirectHeadersAndOriginalPath(t *testing.T) {
+	svc := httpService(&ir.HTTPExtAuthService{
+		Destination:  ir.RouteDestination{Name: "authelia"},
+		Authority:    "authelia.user-system-alice:9091",
+		Path:         "/",
+		PathOverride: "/api/verify",
+		HeadersToBackend: []string{
+			"authorization",
+			"remote-user",
+		},
+	}, durationpb.New(10*time.Second))
+
+	require.NotNil(t, svc)
+	require.NotNil(t, svc.AuthorizationRequest)
+	require.Len(t, svc.AuthorizationRequest.HeadersToAdd, 5)
+
+	gotReq := map[string]string{}
+	for _, h := range svc.AuthorizationRequest.HeadersToAdd {
+		gotReq[h.Key] = h.Value
+	}
+	assert.Equal(t, "%REQ(:METHOD)%", gotReq["X-Forwarded-Method"])
+	assert.Equal(t, "%REQ(:SCHEME)%", gotReq["X-Forwarded-Proto"])
+	assert.Equal(t, "%REQ(:AUTHORITY)%", gotReq["X-Forwarded-Host"])
+	assert.Equal(t, "%REQ(:PATH)%", gotReq["X-Forwarded-Uri"])
+	assert.Equal(t, "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%", gotReq["X-Forwarded-For"])
+
+	require.NotNil(t, svc.AuthorizationResponse)
+	require.NotNil(t, svc.AuthorizationResponse.AllowedClientHeaders)
+	clientExact := map[string]bool{}
+	for _, p := range svc.AuthorizationResponse.AllowedClientHeaders.Patterns {
+		clientExact[p.GetExact()] = true
+	}
+	assert.True(t, clientExact["location"])
+	assert.True(t, clientExact["set-cookie"])
+	assert.True(t, clientExact["www-authenticate"])
+
+	require.NotNil(t, svc.AuthorizationResponse.AllowedUpstreamHeaders)
+	assert.Equal(t, "/api/verify", svc.PathOverride)
+	assert.Contains(t, svc.ServerUri.Uri, "/api/verify")
+}
+
+func TestHttpServiceAlwaysSetsClientHeadersWithoutUpstreamHeaders(t *testing.T) {
+	svc := httpService(&ir.HTTPExtAuthService{
+		Destination: ir.RouteDestination{Name: "authelia"},
+		Authority:   "authelia:9091",
+		Path:        "/auth",
+	}, durationpb.New(defaultExtServiceRequestTimeout))
+
+	require.NotNil(t, svc.AuthorizationResponse)
+	require.NotNil(t, svc.AuthorizationResponse.AllowedClientHeaders)
+	assert.Nil(t, svc.AuthorizationResponse.AllowedUpstreamHeaders)
+	require.NotNil(t, svc.AuthorizationRequest)
+	require.NotEmpty(t, svc.AuthorizationRequest.HeadersToAdd)
+}

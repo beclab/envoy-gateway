@@ -180,6 +180,26 @@ func extAuthConfig(extAuth *ir.ExtAuth) (*extauthv3.ExtAuthz, error) {
 	return config, nil
 }
 
+// defaultExtAuthClientHeaders are auth denial/challenge headers that must reach
+// the downstream client. Without these, Envoy commonly synthesizes 403 when
+// Authelia /api/verify returns 302+Location (Olares EG PEP contract).
+var defaultExtAuthClientHeaders = []string{
+	"set-cookie",
+	"location",
+	"www-authenticate",
+}
+
+// defaultExtAuthRequestHeaders mirror olares-envoy-sidecar so Authelia receives
+// original client method/host/path even when PathOverride rewrites the check URI
+// (e.g. to /api/verify). %REQ(:PATH)% is the original request path.
+var defaultExtAuthRequestHeaders = []*corev3.HeaderValue{
+	{Key: "X-Forwarded-Method", Value: "%REQ(:METHOD)%"},
+	{Key: "X-Forwarded-Proto", Value: "%REQ(:SCHEME)%"},
+	{Key: "X-Forwarded-Host", Value: "%REQ(:AUTHORITY)%"},
+	{Key: "X-Forwarded-Uri", Value: "%REQ(:PATH)%"},
+	{Key: "X-Forwarded-For", Value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"},
+}
+
 func httpService(http *ir.HTTPExtAuthService, timeout *durationpb.Duration) *extauthv3.HttpService {
 	var (
 		uri     string
@@ -213,6 +233,10 @@ func httpService(http *ir.HTTPExtAuthService, timeout *durationpb.Duration) *ext
 		Timeout: timeout,
 	}
 
+	service.AuthorizationRequest = &extauthv3.AuthorizationRequest{
+		HeadersToAdd: defaultExtAuthRequestHeaders,
+	}
+
 	headersToBackend := make([]*matcherv3.StringMatcher, 0, len(http.HeadersToBackend))
 	for _, header := range http.HeadersToBackend {
 		headersToBackend = append(headersToBackend, &matcherv3.StringMatcher{
@@ -223,13 +247,27 @@ func httpService(http *ir.HTTPExtAuthService, timeout *durationpb.Duration) *ext
 		})
 	}
 
-	if len(headersToBackend) > 0 {
-		service.AuthorizationResponse = &extauthv3.AuthorizationResponse{
-			AllowedUpstreamHeaders: &matcherv3.ListStringMatcher{
-				Patterns: headersToBackend,
+	clientHeaders := make([]*matcherv3.StringMatcher, 0, len(defaultExtAuthClientHeaders))
+	for _, header := range defaultExtAuthClientHeaders {
+		clientHeaders = append(clientHeaders, &matcherv3.StringMatcher{
+			MatchPattern: &matcherv3.StringMatcher_Exact{
+				Exact: header,
 			},
+			IgnoreCase: true,
+		})
+	}
+
+	authResp := &extauthv3.AuthorizationResponse{
+		AllowedClientHeaders: &matcherv3.ListStringMatcher{
+			Patterns: clientHeaders,
+		},
+	}
+	if len(headersToBackend) > 0 {
+		authResp.AllowedUpstreamHeaders = &matcherv3.ListStringMatcher{
+			Patterns: headersToBackend,
 		}
 	}
+	service.AuthorizationResponse = authResp
 
 	return service
 }

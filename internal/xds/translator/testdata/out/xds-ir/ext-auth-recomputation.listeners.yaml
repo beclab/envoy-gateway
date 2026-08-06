@@ -21,7 +21,27 @@
             clearRouteCache: true
             failureModeAllow: true
             httpService:
+              authorizationRequest:
+                headersToAdd:
+                - key: X-Forwarded-Method
+                  value: '%REQ(:METHOD)%'
+                - key: X-Forwarded-Proto
+                  value: '%REQ(:SCHEME)%'
+                - key: X-Forwarded-Host
+                  value: '%REQ(:AUTHORITY)%'
+                - key: X-Forwarded-Uri
+                  value: '%REQ(:PATH)%'
+                - key: X-Forwarded-For
+                  value: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
               authorizationResponse:
+                allowedClientHeaders:
+                  patterns:
+                  - exact: set-cookie
+                    ignoreCase: true
+                  - exact: location
+                    ignoreCase: true
+                  - exact: www-authenticate
+                    ignoreCase: true
                 allowedUpstreamHeaders:
                   patterns:
                   - exact: header1
